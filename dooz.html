@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="fa">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>بازی دوز با ربات</title>
+    <style>
+        body { text-align: center; font-family: Arial, sans-serif; background: #f0f8ff; }
+        .container { display: none; }
+        .board { display: grid; grid-template-columns: repeat(3, 100px); grid-gap: 5px; margin: 20px auto; width: 320px; position: relative; }
+        .cell { width: 100px; height: 100px; font-size: 2.5em; text-align: center; line-height: 100px; background: #fff; border: 2px solid #333; cursor: pointer; font-weight: bold; color: #444; display: flex; align-items: center; justify-content: center; }
+        .cell:hover { background: #ddd; }
+        .X { color: red; }
+        .O { color: blue; }
+        #status { font-size: 1.5em; margin: 10px; font-weight: bold; }
+        button, select, input { font-size: 1.2em; padding: 10px; margin-top: 10px; cursor: pointer; background: #28a745; color: #fff; border: none; border-radius: 5px; }
+        button:hover { background: #218838; }
+        .win-line { position: absolute; height: 6px; background: gold; transition: width 0.3s ease-in-out; transform-origin: left center; }
+    </style>
+</head>
+<body>
+
+    <div id="nameForm">
+        <h2>نام خود را وارد کنید:</h2>
+        <input type="text" id="playerName" placeholder="نام شما">
+        <button onclick="startGame()">شروع بازی</button>
+    </div>
+
+    <div class="container" id="gameContainer">
+        <h1>بازی دوز با ربات</h1>
+        <p>بازیکن: <span id="playerDisplay">---</span></p>
+        <label for="difficulty">سطح دشواری:</label>
+        <select id="difficulty" onchange="resetGame()">
+            <option value="easy">آسان</option>
+            <option value="hard">سخت</option>
+            <option value="veryHard">خیلی سخت</option>
+            <option value="legend">لجند</option>
+        </select>
+
+        <div id="status">نوبت: X</div>
+        <div class="board" id="board"></div>
+        <button onclick="resetGame()">شروع مجدد</button>
+        <div id="winLine" class="win-line"></div>
+    </div>
+
+    <script>
+        let board = ["", "", "", "", "", "", "", "", ""];
+        let currentPlayer = "X";
+        let gameActive = true;
+        let playerName = "";
+
+        function startGame() {
+            playerName = document.getElementById("playerName").value.trim();
+            if (playerName === "") {
+                alert("لطفاً نام خود را وارد کنید!");
+                return;
+            }
+            document.getElementById("playerDisplay").textContent = playerName;
+            document.getElementById("nameForm").style.display = "none";
+            document.getElementById("gameContainer").style.display = "block";
+            resetGame();
+        }
+
+        function createBoard() {
+            const boardElement = document.getElementById("board");
+            boardElement.innerHTML = "";
+            board.forEach((cell, index) => {
+                let cellElement = document.createElement("div");
+                cellElement.classList.add("cell");
+                cellElement.innerHTML = cell ? `<span class="${cell}">${cell}</span>` : "";
+                cellElement.addEventListener("click", () => playerMove(index));
+                boardElement.appendChild(cellElement);
+            });
+        }
+
+        function playerMove(index) {
+            if (!gameActive || board[index] !== "") return;
+            board[index] = currentPlayer;
+            createBoard();
+            if (checkWinner(currentPlayer)) return;
+            currentPlayer = "O";
+            document.getElementById("status").textContent = "نوبت: O (ربات)";
+            setTimeout(botMove, 500);
+        }
+
+        function botMove() {
+            if (!gameActive) return;
+            let difficulty = document.getElementById("difficulty").value;
+            let move;
+            if (difficulty === "easy") move = getRandomMove();
+            if (difficulty === "hard") move = getBestMove(1);
+            if (difficulty === "veryHard") move = getBestMove(3);
+            if (difficulty === "legend") move = getBestMove(10);
+            board[move] = "O";
+            createBoard();
+            if (checkWinner("O")) return;
+            currentPlayer = "X";
+            document.getElementById("status").textContent = "نوبت: X";
+        }
+
+        function getRandomMove() {
+            let emptyCells = board.map((val, i) => (val === "" ? i : null)).filter(v => v !== null);
+            return emptyCells[Math.floor(Math.random() * emptyCells.length)];
+        }
+
+        function getBestMove(depth) {
+            let bestScore = -Infinity;
+            let move;
+            for (let i = 0; i < board.length; i++) {
+                if (board[i] === "") {
+                    board[i] = "O";
+                    let score = minimax(board, depth, false);
+                    board[i] = "";
+                    if (score > bestScore) {
+                        bestScore = score;
+                        move = i;
+                    }
+                }
+            }
+            return move;
+        }
+
+        function minimax(board, depth, isMaximizing) {
+            let winner = getWinner();
+            if (winner === "O") return 10;
+            if (winner === "X") return -10;
+            if (!board.includes("")) return 0;
+            if (depth === 0) return 0;
+
+            if (isMaximizing) {
+                let bestScore = -Infinity;
+                for (let i = 0; i < board.length; i++) {
+                    if (board[i] === "") {
+                        board[i] = "O";
+                        let score = minimax(board, depth - 1, false);
+                        board[i] = "";
+                        bestScore = Math.max(score, bestScore);
+                    }
+                }
+                return bestScore;
+            } else {
+                let bestScore = Infinity;
+                for (let i = 0; i < board.length; i++) {
+                    if (board[i] === "") {
+                        board[i] = "X";
+                        let score = minimax(board, depth - 1, true);
+                        board[i] = "";
+                        bestScore = Math.min(score, bestScore);
+                    }
+                }
+                return bestScore;
+            }
+        }
+
+        function getWinner() {
+            const winPatterns = [[0, 1, 2], [3, 4, 5], [6, 7, 8], [0, 3, 6], [1, 4, 7], [2, 5, 8], [0, 4, 8], [2, 4, 6]];
+            for (let pattern of winPatterns) {
+                let [a, b, c] = pattern;
+                if (board[a] && board[a] === board[b] && board[a] === board[c]) return board[a];
+            }
+            return null;
+        }
+
+        function checkWinner(player) {
+            let winner = getWinner();
+            if (winner) {
+                document.getElementById("status").textContent = `برنده: ${player === "X" ? playerName : "ربات"} 🎉`;
+                gameActive = false;
+                return true;
+            }
+            if (!board.includes("")) {
+                document.getElementById("status").textContent = "بازی مساوی شد!";
+                gameActive = false;
+            }
+            return false;
+        }
+
+        function resetGame() {
+            board = ["", "", "", "", "", "", "", "", ""];
+            currentPlayer = "X";
+            gameActive = true;
+            document.getElementById("status").textContent = "نوبت: X";
+            createBoard();
+        }
+
+        createBoard();
+    </script>
+
+</body>
+</html>
